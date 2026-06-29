@@ -61,7 +61,15 @@ def process_analysis_job(self, message: dict):
         if not cv_text.strip() or not jd_text.strip():
             raise ValueError("Could not extract text from CV or JD")
 
+        # Scanned PDF / low-text warning
+        warnings = []
+        if len(cv_text.strip()) < 100:
+            warnings.append("CV text extraction may be incomplete (possible scanned/image file). Results may be less accurate.")
+        if len(jd_text.strip()) < 100:
+            warnings.append("JD text extraction may be incomplete (possible scanned/image file). Results may be less accurate.")
+
         matching_result = calculate_matching(cv_text, jd_text)
+        matching_result["warnings"] = warnings
 
         ai_service = get_ai_service()
         try:

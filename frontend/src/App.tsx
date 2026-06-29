@@ -300,7 +300,7 @@ function App() {
           {jobId && jobStatus !== 'completed' && (
             <div className="card">
               <h2>Upload Documents</h2>
-              <p>PDF or DOCX only, max 10MB.</p>
+              <p>Supports PDF, DOCX, PPTX, TXT — max 10MB.</p>
 
               <div className="upload-grid">
                 <div
@@ -312,7 +312,7 @@ function App() {
                   <input
                     ref={cvInputRef}
                     type="file"
-                    accept=".pdf,.docx"
+                    accept=".pdf,.docx,.pptx,.txt,.doc"
                     style={{ display: 'none' }}
                     onChange={(e) => setCvFile(e.target.files?.[0] || null)}
                   />
@@ -341,7 +341,7 @@ function App() {
                   <input
                     ref={jdInputRef}
                     type="file"
-                    accept=".pdf,.docx"
+                    accept=".pdf,.docx,.pptx,.txt,.doc"
                     style={{ display: 'none' }}
                     onChange={(e) => setJdFile(e.target.files?.[0] || null)}
                   />

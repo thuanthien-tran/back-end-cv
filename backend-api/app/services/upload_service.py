@@ -7,10 +7,17 @@ from fastapi import HTTPException, UploadFile
 
 from app.core.config import settings
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx"}
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc", ".pptx", ".txt", ".rtf"}
 ALLOWED_MIME_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.ms-powerpoint",
+    "text/plain",
+    "application/rtf",
+    "text/rtf",
+    "application/octet-stream",
 }
 
 
@@ -29,10 +36,10 @@ async def validate_file(file: UploadFile) -> bytes:
     original_filename = file.filename or ""
     ext = Path(original_filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail="Only PDF and DOCX files are allowed")
-
-    if file.content_type not in ALLOWED_MIME_TYPES:
-        raise HTTPException(status_code=400, detail="Invalid MIME type")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {ext}. Allowed: PDF, DOCX, PPTX, TXT, DOC, RTF",
+        )
 
     content = await file.read()
     if not content:

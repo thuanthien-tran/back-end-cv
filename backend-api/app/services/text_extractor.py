@@ -10,8 +10,18 @@ def extract_text_from_pdf(content: bytes) -> str:
     reader = PdfReader(BytesIO(content))
     pages: list[str] = []
     for page in reader.pages:
-        pages.append(page.extract_text() or "")
-    return "\n".join(pages).strip()
+        text = page.extract_text() or ""
+        if text.strip():
+            pages.append(text)
+    result = "\n".join(pages).strip()
+    if not result:
+        num_pages = len(reader.pages)
+        raise ValueError(
+            f"PDF has {num_pages} page(s) but no extractable text. "
+            "This might be a scanned/image-based PDF. "
+            "Please use a text-based PDF or DOCX/PPTX instead."
+        )
+    return result
 
 
 def extract_text_from_docx(content: bytes) -> str:

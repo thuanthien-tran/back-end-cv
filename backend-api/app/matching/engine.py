@@ -201,7 +201,7 @@ def calculate_role_compatibility(cv_level: str, jd_level: str) -> float:
 def calculate_domain_compatibility(cv_domains: list[str], jd_domains: list[str]) -> float:
     """Calculate compatibility between CV domains and JD domains."""
     if not cv_domains or not jd_domains:
-        return 60.0
+        return 50.0
 
     cv_set = set(cv_domains)
     jd_set = set(jd_domains)
@@ -305,11 +305,11 @@ def calculate_matching(cv_text: str, jd_text: str) -> dict:
     if candidate_years is not None and required_years:
         experience_score = round(min(candidate_years / required_years, 1) * 100, 2)
     else:
-        experience_score = 60.0
+        experience_score = 50.0  # unknown = neutral, not "medium fit"
 
     education_keywords = ["bachelor", "degree", "university", "computer science",
                           "đại học", "cử nhân", "master", "phd", "thạc sĩ", "tiến sĩ"]
-    education_score = 100.0 if any(keyword in cv_text.lower() for keyword in education_keywords) else 60.0
+    education_score = 100.0 if any(keyword in cv_text.lower() for keyword in education_keywords) else 50.0
 
     keyword_score = calculate_keyword_score(cv_text, jd_text)
     cv_quality_score = calculate_cv_quality(cv_text)
@@ -324,17 +324,27 @@ def calculate_matching(cv_text: str, jd_text: str) -> dict:
     jd_domains = detect_domains(jd_text)
     domain_compatibility = calculate_domain_compatibility(cv_domains, jd_domains)
 
-    # Weighted overall score (updated weights to include role & domain)
+    # Weighted overall score (optimized weights)
+    # Skill + Role + Domain = 70% (most decisive factors)
+    # Experience + Education + Keyword + CV Quality = 30% (supporting factors)
     overall_score = round(
-        skill_score * 0.30
+        skill_score * 0.35
+        + role_compatibility * 0.20
+        + domain_compatibility * 0.15
         + experience_score * 0.15
-        + education_score * 0.10
-        + keyword_score * 0.10
-        + cv_quality_score * 0.05
-        + role_compatibility * 0.15
-        + domain_compatibility * 0.15,
+        + education_score * 0.05
+        + keyword_score * 0.05
+        + cv_quality_score * 0.05,
         2,
     )
+
+    # Score cap rules: prevent inflated scores when critical mismatches exist
+    if role_compatibility <= 20 and domain_compatibility <= 20:
+        overall_score = min(overall_score, 35.0)
+    elif role_compatibility <= 20 or domain_compatibility <= 20:
+        overall_score = min(overall_score, 45.0)
+    if skill_score <= 20 and domain_compatibility <= 30:
+        overall_score = min(overall_score, 40.0)
 
     compatibility = get_compatibility_level(overall_score)
 
@@ -360,8 +370,18 @@ def calculate_matching(cv_text: str, jd_text: str) -> dict:
         "score_breakdown": {
             "skill_match": {
                 "score": skill_score,
-                "weight": 30,
+                "weight": 35,
                 "description": "Mức độ khớp kỹ năng giữa CV và JD",
+            },
+            "role_match": {
+                "score": role_compatibility,
+                "weight": 20,
+                "description": f"Mức độ phù hợp cấp bậc ({cv_role_level} vs {jd_role_level})",
+            },
+            "domain_match": {
+                "score": domain_compatibility,
+                "weight": 15,
+                "description": "Mức độ phù hợp lĩnh vực chuyên môn",
             },
             "experience_match": {
                 "score": experience_score,
@@ -370,28 +390,18 @@ def calculate_matching(cv_text: str, jd_text: str) -> dict:
             },
             "education_match": {
                 "score": education_score,
-                "weight": 10,
+                "weight": 5,
                 "description": "Mức độ phù hợp về học vấn",
             },
             "keyword_match": {
                 "score": keyword_score,
-                "weight": 10,
+                "weight": 5,
                 "description": "Mức độ khớp các từ khóa quan trọng trong JD",
             },
             "cv_quality": {
                 "score": cv_quality_score,
                 "weight": 5,
                 "description": "Chất lượng trình bày và mức độ rõ ràng của CV",
-            },
-            "role_match": {
-                "score": role_compatibility,
-                "weight": 15,
-                "description": f"Mức độ phù hợp cấp bậc ({cv_role_level} vs {jd_role_level})",
-            },
-            "domain_match": {
-                "score": domain_compatibility,
-                "weight": 15,
-                "description": "Mức độ phù hợp lĩnh vực chuyên môn",
             },
         },
     }

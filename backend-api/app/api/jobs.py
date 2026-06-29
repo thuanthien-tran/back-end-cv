@@ -171,6 +171,8 @@ def get_job_result(job_id: UUID, db: Session = Depends(get_db), current_user: Us
             "for_candidate": result.improvement_suggestions or [],
         },
         interview_questions=result.interview_questions or [],
+        alternative_roles=raw.get("alternative_roles", []) if raw else [],
+        warnings=raw.get("warnings", []) if raw else [],
         metadata={
             "ai_provider": result.ai_provider,
             "ai_model": result.ai_model,

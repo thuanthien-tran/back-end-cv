@@ -64,4 +64,6 @@ class ResultResponse(BaseModel):
     candidate_summary: CandidateSummary
     recommendations: Recommendations
     interview_questions: list[str]
+    alternative_roles: list[str]
+    warnings: list[str]
     metadata: dict

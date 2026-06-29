@@ -32,6 +32,8 @@ interface ResultData {
     for_candidate: string[];
   };
   interview_questions?: string[];
+  alternative_roles?: string[];
+  warnings?: string[];
   metadata?: {
     ai_provider: string | null;
     ai_model: string | null;
@@ -83,7 +85,7 @@ export default function ResultReport({ result }: { result: ResultData | null }) 
 
   if (!result || !result.compatibility) return null;
 
-  const { compatibility, score_breakdown, skills_analysis, candidate_summary, recommendations, interview_questions, metadata } = result;
+  const { compatibility, score_breakdown, skills_analysis, candidate_summary, recommendations, interview_questions, alternative_roles, warnings, metadata } = result;
   const scoreClass = getScoreClass(compatibility.overall_score);
 
   const tabs: { key: TabKey; label: string }[] = [
@@ -95,6 +97,19 @@ export default function ResultReport({ result }: { result: ResultData | null }) 
 
   return (
     <div className="result-report">
+      {/* Warnings Banner */}
+      {warnings && warnings.length > 0 && (
+        <div className="warnings-banner">
+          <div className="warning-icon">⚠️</div>
+          <div className="warning-content">
+            <strong>Cảnh báo chất lượng dữ liệu:</strong>
+            <ul>
+              {warnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
+
       <div className={`score-card ${scoreClass}`}>
         <div className="score-card-content">
           <div className="score-card-label">Overall Compatibility</div>
@@ -226,6 +241,18 @@ export default function ResultReport({ result }: { result: ResultData | null }) 
                 {recommendations.for_candidate.map((item, i) => <li key={i}>{item}</li>)}
               </ul>
             </div>
+
+            {alternative_roles && alternative_roles.length > 0 && (
+              <div className="report-card">
+                <h3>Alternative Suitable Roles</h3>
+                <p className="alternative-roles-desc">Dựa trên hồ sơ ứng viên, các vị trí sau có thể phù hợp hơn:</p>
+                <div className="tags">
+                  {alternative_roles.map((role, i) => (
+                    <span className="tag success" key={i}>&#10148; {role}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
 

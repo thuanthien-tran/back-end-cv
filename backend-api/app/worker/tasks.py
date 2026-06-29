@@ -89,6 +89,7 @@ def process_analysis_job(self, message: dict):
         raw_result = dict(matching_result)
         raw_result["risk_flags"] = ai_result.get("risk_flags", [])
         raw_result["recommendations"] = ai_result.get("recommendations", {})
+        raw_result["alternative_roles"] = ai_result.get("alternative_roles", [])
 
         result = AnalysisResult(
             job_id=job.id,

@@ -1,9 +1,30 @@
+import logging
 from io import BytesIO
 from pathlib import Path
 
 from docx import Document
+from PIL import Image
 from pptx import Presentation
 from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
+
+try:
+    import pytesseract
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
+
+
+def ocr_image(image: Image.Image) -> str:
+    if not OCR_AVAILABLE:
+        return ""
+    try:
+        text = pytesseract.image_to_string(image, lang="eng+vie")
+        return text.strip()
+    except Exception as e:
+        logger.warning("OCR failed: %s", e)
+        return ""
 
 
 def extract_text_from_pdf(content: bytes) -> str:
@@ -13,13 +34,37 @@ def extract_text_from_pdf(content: bytes) -> str:
         text = page.extract_text() or ""
         if text.strip():
             pages.append(text)
+
     result = "\n".join(pages).strip()
+
+    if not result and OCR_AVAILABLE:
+        logger.info("PDF has no text layer, attempting OCR on %d pages", len(reader.pages))
+        try:
+            import pdf2image
+            images = pdf2image.convert_from_bytes(content)
+            for img in images:
+                ocr_text = ocr_image(img)
+                if ocr_text:
+                    pages.append(ocr_text)
+            result = "\n".join(pages).strip()
+        except ImportError:
+            for page in reader.pages:
+                for image_obj in page.images:
+                    try:
+                        img = Image.open(BytesIO(image_obj.data))
+                        ocr_text = ocr_image(img)
+                        if ocr_text:
+                            pages.append(ocr_text)
+                    except Exception:
+                        continue
+            result = "\n".join(pages).strip()
+
     if not result:
         num_pages = len(reader.pages)
         raise ValueError(
             f"PDF has {num_pages} page(s) but no extractable text. "
             "This might be a scanned/image-based PDF. "
-            "Please use a text-based PDF or DOCX/PPTX instead."
+            "OCR was attempted but could not extract readable text."
         )
     return result
 
@@ -41,6 +86,7 @@ def extract_text_from_docx(content: bytes) -> str:
 def extract_text_from_pptx(content: bytes) -> str:
     prs = Presentation(BytesIO(content))
     parts: list[str] = []
+
     for slide in prs.slides:
         for shape in slide.shapes:
             if shape.has_text_frame:
@@ -53,6 +99,21 @@ def extract_text_from_pptx(content: bytes) -> str:
                     row_text = " | ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
                     if row_text:
                         parts.append(row_text)
+
+    if not parts and OCR_AVAILABLE:
+        logger.info("PPTX has no text, attempting OCR on images")
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if shape.shape_type == 13:
+                    try:
+                        img = Image.open(BytesIO(shape.image.blob))
+                        ocr_text = ocr_image(img)
+                        if ocr_text:
+                            parts.append(ocr_text)
+                    except Exception as e:
+                        logger.warning("Failed to OCR PPTX image: %s", e)
+                        continue
+
     return "\n".join(parts).strip()
 
 

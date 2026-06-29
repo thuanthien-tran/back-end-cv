@@ -126,6 +126,28 @@ def extract_text_from_txt(content: bytes) -> str:
     return content.decode("utf-8", errors="replace").strip()
 
 
+def extract_text_from_image(content: bytes) -> str:
+    """Extract text from image files (PNG, JPG, JPEG, BMP, TIFF) using OCR."""
+    if not OCR_AVAILABLE:
+        raise ValueError(
+            "Image file uploaded but OCR is not available. "
+            "Please use a text-based file (PDF, DOCX, PPTX, TXT) instead."
+        )
+    try:
+        img = Image.open(BytesIO(content))
+        text = ocr_image(img)
+        if not text:
+            raise ValueError(
+                "Could not extract text from image. "
+                "The image may be too low quality or does not contain readable text."
+            )
+        return text
+    except Exception as e:
+        if "Could not extract" in str(e):
+            raise
+        raise ValueError(f"Failed to process image: {e}")
+
+
 def extract_text(content: bytes, path: str) -> str:
     ext = Path(path).suffix.lower()
     if ext == ".pdf":
@@ -138,4 +160,6 @@ def extract_text(content: bytes, path: str) -> str:
         return extract_text_from_txt(content)
     if ext == ".doc":
         return extract_text_from_txt(content)
+    if ext in (".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif"):
+        return extract_text_from_image(content)
     raise ValueError(f"Unsupported file type: {ext}")

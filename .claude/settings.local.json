@@ -3,7 +3,9 @@
     "allow": [
       "PowerShell(docker compose up)",
       "PowerShell(docker compose ps *)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "PowerShell(git push *)",
+      "PowerShell(docker compose *)"
     ]
   }
 }

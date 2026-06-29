@@ -196,6 +196,62 @@ def extract_skills(text: str) -> set[str]:
     return found
 
 
+# Indicators for must-have vs nice-to-have classification
+MUST_HAVE_INDICATORS = {
+    "required", "must have", "must-have", "essential", "mandatory",
+    "minimum", "necessary", "critical", "key requirement",
+    "bắt buộc", "yêu cầu", "tối thiểu", "cần có",
+    "qualifications", "requirements", "responsibilities",
+}
+
+NICE_TO_HAVE_INDICATORS = {
+    "preferred", "nice to have", "nice-to-have", "bonus", "plus",
+    "advantage", "desirable", "optional", "good to have",
+    "ưu tiên", "có thì tốt", "lợi thế", "mong muốn",
+}
+
+
+def classify_jd_skills(jd_text: str, jd_skills: set[str]) -> dict:
+    """Classify JD skills into must-have and nice-to-have based on context."""
+    text_lower = jd_text.lower()
+    lines = text_lower.split('\n')
+
+    must_have_skills: set[str] = set()
+    nice_to_have_skills: set[str] = set()
+
+    # Find sections that indicate must-have or nice-to-have
+    in_must_have_section = True  # Default: if no clear section, treat as must-have
+    in_nice_to_have_section = False
+
+    for line in lines:
+        # Check if this line starts a must-have section
+        if any(indicator in line for indicator in MUST_HAVE_INDICATORS):
+            in_must_have_section = True
+            in_nice_to_have_section = False
+
+        # Check if this line starts a nice-to-have section
+        if any(indicator in line for indicator in NICE_TO_HAVE_INDICATORS):
+            in_nice_to_have_section = True
+            in_must_have_section = False
+
+        # Check which skills appear in this line
+        for skill in jd_skills:
+            if _contains_skill(line, skill.lower()):
+                if in_nice_to_have_section:
+                    nice_to_have_skills.add(skill)
+                else:
+                    must_have_skills.add(skill)
+
+    # Skills not classified go to must-have by default
+    unclassified = jd_skills - must_have_skills - nice_to_have_skills
+    must_have_skills.update(unclassified)
+
+    return {
+        "must_have": sorted(must_have_skills),
+        "nice_to_have": sorted(nice_to_have_skills),
+    }
+
+
 def detect_role_level(text: str) -> str:
     """Detect the seniority/role level from text."""
     text_lower = text.lower()
@@ -347,7 +403,29 @@ def calculate_matching(cv_text: str, jd_text: str) -> dict:
     missing_skills = sorted(jd_skills - cv_skills)
     extra_skills = sorted(cv_skills - jd_skills)
 
-    skill_score = round(len(matched_skills) / len(jd_skills) * 100, 2) if jd_skills else 0.0
+    # Classify JD skills into must-have and nice-to-have
+    skill_classification = classify_jd_skills(jd_text, jd_skills)
+    must_have_skills = set(skill_classification["must_have"])
+    nice_to_have_skills = set(skill_classification["nice_to_have"])
+
+    # Calculate weighted skill score: must-have 70%, nice-to-have 30%
+    matched_must_have = sorted(cv_skills & must_have_skills)
+    matched_nice_to_have = sorted(cv_skills & nice_to_have_skills)
+    missing_must_have = sorted(must_have_skills - cv_skills)
+    missing_nice_to_have = sorted(nice_to_have_skills - cv_skills)
+
+    must_have_score = round(len(matched_must_have) / len(must_have_skills) * 100, 2) if must_have_skills else 0.0
+    nice_to_have_score = round(len(matched_nice_to_have) / len(nice_to_have_skills) * 100, 2) if nice_to_have_skills else 0.0
+
+    # Weighted skill score
+    if must_have_skills and nice_to_have_skills:
+        skill_score = round(must_have_score * 0.70 + nice_to_have_score * 0.30, 2)
+    elif must_have_skills:
+        skill_score = must_have_score
+    elif nice_to_have_skills:
+        skill_score = nice_to_have_score
+    else:
+        skill_score = 0.0
 
     candidate_years = extract_years_experience(cv_text)
     required_years = extract_years_experience(jd_text)
@@ -394,12 +472,17 @@ def calculate_matching(cv_text: str, jd_text: str) -> dict:
         overall_score = min(overall_score, 45.0)
     if skill_score <= 20 and domain_compatibility <= 30:
         overall_score = min(overall_score, 40.0)
+    # Cap if all must-have skills are missing
+    if must_have_skills and must_have_score == 0:
+        overall_score = min(overall_score, 40.0)
 
     compatibility = get_compatibility_level(overall_score)
 
     return {
         "matching_score": overall_score,
         "skill_score": skill_score,
+        "must_have_score": must_have_score,
+        "nice_to_have_score": nice_to_have_score,
         "experience_score": experience_score,
         "education_score": education_score,
         "keyword_score": keyword_score,
@@ -409,6 +492,10 @@ def calculate_matching(cv_text: str, jd_text: str) -> dict:
         "matched_skills": matched_skills,
         "missing_skills": missing_skills,
         "extra_skills": extra_skills,
+        "matched_must_have": matched_must_have,
+        "missing_must_have": missing_must_have,
+        "matched_nice_to_have": matched_nice_to_have,
+        "missing_nice_to_have": missing_nice_to_have,
         "candidate_years": candidate_years,
         "required_years": required_years,
         "cv_role_level": cv_role_level,
@@ -420,7 +507,7 @@ def calculate_matching(cv_text: str, jd_text: str) -> dict:
             "skill_match": {
                 "score": skill_score,
                 "weight": 35,
-                "description": "Mức độ khớp kỹ năng giữa CV và JD",
+                "description": f"Kỹ năng bắt buộc: {must_have_score:.0f}% | Kỹ năng ưu tiên: {nice_to_have_score:.0f}%",
             },
             "role_match": {
                 "score": role_compatibility,
